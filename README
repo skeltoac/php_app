@@ -1,0 +1,16 @@
+php_app - PHP eval server for Erlang/OTP
+
+Requires Unix/Linux due to dependency on `ps` command to test PHP memory usage.
+
+To compile in erl shell:
+  make:all().
+
+To configure, edit php.app.
+
+To start,
+  erl -s php
+or
+  php:start().
+
+To use,
+  php:eval("echo 'Hello, World!'").
