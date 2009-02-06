@@ -1,0 +1,146 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Module php</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module php</h1>
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>This module provides all of the API functions and a gen_server       
+that marshals requests for PHP code evaluation.
+
+<p><b>Behaviours:</b> <a href="gen_server.html"><tt>gen_server</tt></a>.</p>
+<p><b>Authors:</b> Andy Skelton (<a href="mailto:andy@automattic.com"><tt>andy@automattic.com</tt></a>) [<em>web site:</em> <tt><a href="http://andy.wordpress.com/" target="_top">http://andy.wordpress.com/</a></tt>].</p>
+
+<h2><a name="description">Description</a></h2><p>This module provides all of the API functions and a gen_server       
+that marshals requests for PHP code evaluation. It maintains       
+queues of available and reserved PHP processes and serves each       
+client request in order. PHP processes are reused to cut down       
+on startup overhead and memory limits are checked after each       
+PHP code evaluation to help prevent resource hogging.</p>
+ 
+       Configuration is done in the php.app file. Options include the
+       path to the PHP binary, code to initialize the environment,
+       and a default memory limit. It is also possible to set the
+       number of concurrent PHP instances; the default is the number
+       of logical processors available to the Erlang VM.
+<h2><a name="types">Data Types</a></h2>
+
+<h3 class="typedecl"><a name="type-result">result()</a></h3>
+<p><tt>result() = {ok, Output, Return, Error, Status} | {parse_error, Error, Status} | {exit, ExitCode | timeout}</tt>
+<ul class="definitions"><li><tt>Output = binary()</tt></li>
+<li><tt>Return = any()</tt></li>
+<li><tt>Error = binary()</tt></li>
+<li><tt>Status = continue | break</tt></li>
+<li><tt>ExitCode = integer()</tt></li>
+</ul></p>
+
+
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#eval-1">eval/1</a></td><td>Equivalent to eval(Code, undefined, infinity).</td></tr>
+<tr><td valign="top"><a href="#eval-2">eval/2</a></td><td>Equivalent to eval(Code, Php, infinity) or eval(Code,
+       undefined, Timeout).</td></tr>
+<tr><td valign="top"><a href="#eval-3">eval/3</a></td><td>Tests syntax and evaluates PHP code.</td></tr>
+<tr><td valign="top"><a href="#get_mem-1">get_mem/1</a></td><td>Measures the memory footprint of the PHP instance using
+       `ps -o rss`.</td></tr>
+<tr><td valign="top"><a href="#release-1">release/1</a></td><td>Cancels the reservation of a PHP instance, returning it
+       to the pool of available instances.</td></tr>
+<tr><td valign="top"><a href="#reserve-0">reserve/0</a></td><td>Equivalent to reserve(undefined).</td></tr>
+<tr><td valign="top"><a href="#reserve-1">reserve/1</a></td><td>Reserves a PHP instance that will only be accessible to
+       callers possessing the key returned by this function.</td></tr>
+<tr><td valign="top"><a href="#restart_all-0">restart_all/0</a></td><td>Restarts each PHP thread, waiting if any are reserved.</td></tr>
+<tr><td valign="top"><a href="#start-0">start/0</a></td><td>Starts the PHP application, supervisor, a number of workers,
+       and this API server module with the options set in php.app.</td></tr>
+<tr><td valign="top"><a href="#stop-0">stop/0</a></td><td>Stops the PHP application and everything it started.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="eval-1">eval/1</a></h3>
+<div class="spec">
+<p><tt>eval(Code) -&gt; <a href="#type-result">result()</a></tt>
+<ul class="definitions"><li><tt>Code = list() | binary()</tt></li>
+</ul></p>
+</div><p>Equivalent to eval(Code, undefined, infinity).</p>
+
+<h3 class="function"><a name="eval-2">eval/2</a></h3>
+<div class="spec">
+<p><tt>eval(Code, Ref::reference() | Timeout) -&gt; <a href="#type-result">result()</a></tt>
+<ul class="definitions"><li><tt>Timeout = integer() | infinity</tt></li>
+</ul></p>
+</div><p>Equivalent to eval(Code, Php, infinity) or eval(Code,
+       undefined, Timeout).</p>
+
+<h3 class="function"><a name="eval-3">eval/3</a></h3>
+<div class="spec">
+<p><tt>eval(Code, Ref, Timeout) -&gt; <a href="#type-result">result()</a> | {error, term()}</tt>
+<ul class="definitions"><li><tt>Code = list() | binary()</tt></li>
+<li><tt>Ref = reference() | undefined</tt></li>
+<li><tt>Timeout = integer() | infinity</tt></li>
+</ul></p>
+</div><p>Tests syntax and evaluates PHP code.
+       A parse error will result in {parse_error, Error, Status}.
+       A fatal error or exit() will result in {exit, ExitCode}.
+       On success, Error contains the last error message. You may
+       call trigger_error() to store a string here but an error or
+       warning (subject to error_reporting()) will overwrite it.
+       Status indicates whether the PHP process continued or broke
+       after evaluation. This suggests that any variables you set
+       in a reserved PHP persist but that can not be guaranteed.</p>
+
+<h3 class="function"><a name="get_mem-1">get_mem/1</a></h3>
+<div class="spec">
+<p><tt>get_mem(Ref::reference()) -&gt; integer() | {error, term()}</tt></p>
+</div><p>Measures the memory footprint of the PHP instance using
+       `ps -o rss`. If the instance has died, it is restarted
+       before the measurement is taken.</p>
+
+<h3 class="function"><a name="release-1">release/1</a></h3>
+<div class="spec">
+<p><tt>release(Ref::reference()) -&gt; ok</tt></p>
+</div><p>Cancels the reservation of a PHP instance, returning it
+       to the pool of available instances.</p>
+
+<h3 class="function"><a name="reserve-0">reserve/0</a></h3>
+<div class="spec">
+<p><tt>reserve() -&gt; reference()</tt></p>
+</div><p>Equivalent to reserve(undefined).</p>
+
+<h3 class="function"><a name="reserve-1">reserve/1</a></h3>
+<div class="spec">
+<p><tt>reserve(MaxMem) -&gt; reference()</tt>
+<ul class="definitions"><li><tt>MaxMem = integer() | infinity | undefined</tt></li>
+</ul></p>
+</div><p>Reserves a PHP instance that will only be accessible to
+       callers possessing the key returned by this function. A
+       reservation can be passed around or held indefinitely.
+       MaxMem is in KiB. PHP size is measured by `ps -o rss`
+       after each evaluation and if it exceeds MaxMem, the PHP
+       instance is restarted and the returned Status is break.
+       If MaxMem is undefined, it becomes the value in php.app.</p>
+
+<h3 class="function"><a name="restart_all-0">restart_all/0</a></h3>
+<div class="spec">
+<p><tt>restart_all() -&gt; ok</tt></p>
+</div><p>Restarts each PHP thread, waiting if any are reserved. This
+       is intended to force an updated PHPLOOP into use.</p>
+
+<h3 class="function"><a name="start-0">start/0</a></h3>
+<div class="spec">
+<p><tt>start() -&gt; ok</tt></p>
+</div><p>Starts the PHP application, supervisor, a number of workers,
+       and this API server module with the options set in php.app.</p>
+
+<h3 class="function"><a name="stop-0">stop/0</a></h3>
+<div class="spec">
+<p><tt>stop() -&gt; ok</tt></p>
+</div><p>Stops the PHP application and everything it started.</p>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc, Feb 6 2009, 09:29:57.</i></p>
+</body>
+</html>
