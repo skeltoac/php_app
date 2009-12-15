@@ -12,7 +12,7 @@
 -module(php_util).
 -author("Richard Jones <rj at last.fm>"). % http://www.metabrew.com/article/reading-serialized-php-objects-from-erlang/ GPLv2
 -author("Andy Skelton <andy at automattic.com>"). % minor tweaks
--author("Alvaro Videla <videlalvaro at gmail.com>"). % Session unserialize code
+-author("Alvaro Videla <alvaro at thenetcircle.com>"). % Session unserialize code
 -export([unserialize/1, unserialize_session/1]).
 -export([get_opt/3]).
 
@@ -30,10 +30,11 @@ acumulate_session(S, Acc) ->
     _ -> Acc
   end.
   
-  
+
 takeval_session([], Acc) ->
   % io:format("session_end~n"),
   {session_end, Acc};
+% We search for a Pipe "|" as limiter of the session keys
 takeval_session([124 | Leftover], Acc) ->
   % io:format("[124 | Leftover]~n"),
   {list_to_atom(lists:reverse(Acc)), Leftover};
