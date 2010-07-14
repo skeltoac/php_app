@@ -1,20 +1,36 @@
-INCLUDEDIR=src
-TARGETDIR=ebin
-SRCDIR=src
+SOURCEDIR  := src
+INCLUDEDIR := include
+TARGETDIR  := ebin
 
-INCLUDEFLAGS=$(patsubst %,-I%, ${INCLUDEDIR})
+INCLUDEFLAGS := $(patsubst %,-I %, $(INCLUDEDIR))
 
-MODULES = php_app php php_eval php_sup php_util
-INCLUDES = 
-TARGETS = $(patsubst %,${TARGETDIR}/%.beam,${MODULES})
-HEADERS = $(patsubst %,${INCLUDEDIR}/%.hrl,${INCLUDES})
+MODULES  := $(patsubst $(SOURCEDIR)/%.erl,%,$(wildcard $(SOURCEDIR)/*.erl))
+APPS     := $(patsubst $(SOURCEDIR)/%.app,%,$(wildcard $(SOURCEDIR)/*.app))
 
-all: ${TARGETS}
+INCLUDES := $(wildcard $(INCLUDEDIR)/*.hrl)
+TARGETS  := $(patsubst %,$(TARGETDIR)/%.beam,$(MODULES))
+APPFILES := $(patsubst %,$(TARGETDIR)/%.app,$(APPS))
 
-$(TARGETS): ${TARGETDIR}/%.beam: ${SRCDIR}/%.erl ${HEADERS}
-	mkdir -p ebin
-	erlc ${INCLUDEFLAGS} -o ${TARGETDIR} $<
-	cp ${SRCDIR}/*.app $(TARGETDIR)
+all : $(TARGETDIR) $(APPFILES) $(TARGETS)
 
-clean:
-	rm -f ${TARGETDIR}/*.beam
+$(TARGETDIR) :
+	@echo "Creating target directory $(TARGETDIR)"
+	@mkdir -p $(TARGETDIR)
+
+$(TARGETS) : $(TARGETDIR)/%.beam: $(SOURCEDIR)/%.erl $(INCLUDES)
+	@echo "Compiling module $*"
+	@erlc $(INCLUDEFLAGS) -o $(TARGETDIR) $<
+
+$(APPFILES) : $(TARGETDIR)/%.app: $(SOURCEDIR)/%.app
+	@echo "Copying application $*"
+	@cp $< $@
+
+clean :
+	@if [ -d $(TARGETDIR) ]; then \
+		echo "Deleting ebin and app files from $(TARGETDIR)..."; \
+		rm -f $(TARGETS) $(APPFILES); \
+		rmdir $(TARGETDIR); \
+	 else \
+		echo "Nothing to clean."; \
+	 fi
+	@rm -f erl_crash.dump
