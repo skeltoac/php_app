@@ -43,38 +43,38 @@
 
 %% API
 -export([
-		 start/0,
-		 stop/0,
-		 start_link/0,
-		 eval/1,eval/2,eval/3,
-		 reserve/0,reserve/1,
-		 release/1,
-		 get_mem/1,
-		 restart_all/0
-		]).
+	 start/0,
+	 stop/0,
+	 start_link/0,
+	 eval/1,eval/2,eval/3,
+	 reserve/0,reserve/1,
+	 release/1,
+	 get_mem/1,
+	 restart_all/0
+	]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-		 terminate/2, code_change/3]).
+	 terminate/2, code_change/3]).
 
 -record(state, {
-		  sup,
-		  free     = [],
-		  reserved = [],
-		  waiting  = [],
-		  restart
-		 }).
+	  sup,
+	  free     = [],
+	  reserved = [],
+	  waiting  = [],
+	  restart
+	 }).
 
 -record(php, {
-		  ref,
-		  pid,
-		  maxmem
-		 }).
+	  ref,
+	  pid,
+	  maxmem
+	 }).
 
 -record(restart, {
-		  pids = [],
-		  froms = []
-		 }).
+	  pids = [],
+	  froms = []
+	 }).
 
 %%====================================================================
 %% API
@@ -84,19 +84,19 @@
 %% @doc Starts the PHP application, supervisor, a number of workers,
 %%      and this API server module with the options set in php.app.
 start() ->
-	application:start(php).
+    application:start(php).
 
 %% @spec stop() -> ok
 %% @doc Stops the PHP application and everything it started.
 stop() ->
-	application:stop(php).
+    application:stop(php).
 
 %% @private
 %% @spec start_link() -> {ok, state()}
 %% @doc An entry point for the supervisor. This calls init(Pid) with
 %%      the pid of the supervisor so we can discover the workers.
 start_link() ->
-	gen_server:start_link({local, ?MODULE}, ?MODULE, self(), []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, self(), []).
 
 %% @spec eval(Code) -> result()
 %%       Code = list() | binary()
@@ -110,18 +110,18 @@ start_link() ->
 %%       ExitCode = integer()
 %% @doc Equivalent to eval(Code, undefined, infinity).
 eval(Code) ->
-	eval(Code, undefined, infinity).
+    eval(Code, undefined, infinity).
 
 %% @spec eval(Code, (reference() | Timeout)) -> result()
 %%       Timeout = integer() | infinity
 %% @doc Equivalent to eval(Code, Php, infinity) or eval(Code,
 %%      undefined, Timeout).
 eval(Code, Ref) when is_reference(Ref) ->
-	eval(Code, Ref, infinity);
+    eval(Code, Ref, infinity);
 eval(Code, Timeout) when is_integer(Timeout), Timeout > 0; Timeout =:= infinity ->
-	eval(Code, undefined, Timeout);
+    eval(Code, undefined, Timeout);
 eval(_, _) ->
-	{error, invalid_argument}.
+    {error, invalid_argument}.
 
 %% @spec eval(Code, Ref, Timeout) -> result() | {error, term()}
 %%       Code     = list() | binary()
@@ -137,12 +137,12 @@ eval(_, _) ->
 %%      after evaluation. This suggests that any variables you set
 %%      in a reserved PHP persist but that can not be guaranteed.
 eval(Code, Ref, Timeout) ->
-	gen_server:call(?MODULE, {eval, Code, Ref, Timeout}, infinity).
+    gen_server:call(?MODULE, {eval, Code, Ref, Timeout}, infinity).
 
 %% @spec reserve() -> reference()
 %% @doc Equivalent to reserve(undefined).
 reserve() ->
-	reserve(undefined).
+    reserve(undefined).
 
 %% @spec reserve(MaxMem) -> reference()
 %%       MaxMem  = integer() | infinity | undefined
@@ -154,26 +154,26 @@ reserve() ->
 %%      instance is restarted and the returned Status is break.
 %%      If MaxMem is undefined, it becomes the value in php.app.
 reserve(MaxMem) ->
-	gen_server:call(?MODULE, {reserve, MaxMem, ref}, infinity).
+    gen_server:call(?MODULE, {reserve, MaxMem, ref}, infinity).
 
 %% @spec release(reference()) -> ok
 %% @doc Cancels the reservation of a PHP instance, returning it
 %%      to the pool of available instances.
 release(Ref) ->
-	gen_server:cast(?MODULE, {release, Ref}).
+    gen_server:cast(?MODULE, {release, Ref}).
 
 %% @spec get_mem(reference()) -> integer() | {error, term()}
 %% @doc Measures the memory footprint of the PHP instance using
 %%      `'ps -o rss`'. If the instance has died, it is restarted
 %%      before the measurement is taken.
 get_mem(Ref) ->
-	gen_server:call(?MODULE, {get_mem, Ref}, infinity).
+    gen_server:call(?MODULE, {get_mem, Ref}, infinity).
 
 %% @spec restart_all() -> ok
 %% @doc Restarts each PHP thread, waiting if any are reserved. This
 %%      is intended to force an updated PHPLOOP into use.
 restart_all() ->
-	gen_server:call(?MODULE, restart_all, infinity).
+    gen_server:call(?MODULE, restart_all, infinity).
 
 %%====================================================================
 %% gen_server callbacks
@@ -181,165 +181,165 @@ restart_all() ->
 
 %% @private
 init(From) ->
-	process_flag(trap_exit,true),
-	State=#state{sup=From,restart=#restart{}},
-	{ok, State}.
+    process_flag(trap_exit,true),
+    State=#state{sup=From,restart=#restart{}},
+    {ok, State}.
 
 %% @private
 handle_call(get_state, _From, State) ->
-	{reply, State, State};
+    {reply, State, State};
 handle_call({eval, Code, Ref, Timeout}, From, State) ->
-	Php = if
-			  Ref =:= undefined ->
-				  undefined;
-			  true ->
-				  find_php(Ref, State#state.reserved)
-		  end,
-	if
-		Php =:= none ->
-			{reply, {error, invalid_reservation}, State};
-		true ->
-			spawn_link( fun () -> do_eval(Code, Php, From, Timeout) end ),
-			{noreply, State}
-	end;
+    Php = if
+	      Ref =:= undefined ->
+		  undefined;
+	      true ->
+		  find_php(Ref, State#state.reserved)
+	  end,
+    if
+	Php =:= none ->
+	    {reply, {error, invalid_reservation}, State};
+	true ->
+	    spawn_link( fun () -> do_eval(Code, Php, From, Timeout) end ),
+	    {noreply, State}
+    end;
 handle_call({reserve, MaxMem, What}, From, State) ->
-	case State#state.waiting of
-		[] -> % no processes waiting for php reservation
-			case {State#state.free, State#state.reserved} of
-				{[],[]} -> % php_eval workers undiscovered (first call to reserve)
-					[Pid|Free] = lists:foldl(
-									  fun ({_,Pid,_,[php_eval]}, Acc)->[Pid|Acc];
-										  (_, Acc) -> Acc
-									  end,
-									  [],
-									  supervisor:which_children(State#state.sup)
-									 ),
-					Php = make_php(Pid,MaxMem),
-					{reply, make_reply(Php, What), State#state{free=Free, reserved=[Php]}};
-				{[],_} -> % all php_eval workers are reserved
-					Waiting = [{From,MaxMem,What}],
-					{noreply, State#state{waiting=Waiting}};
-				{[Pid|Free],_} -> % at least one php_eval worker is free
-					Php = make_php(Pid,MaxMem),
-					Reserved = [Php|State#state.reserved],
-					{reply, make_reply(Php, What), State#state{free=Free, reserved=Reserved}}
-			end;
-		_ -> % processes are already waiting
-			Waiting = State#state.waiting++[{From,MaxMem,What}],
-			{noreply, State#state{waiting=Waiting}}
-	end;
+    case State#state.waiting of
+	[] -> % no processes waiting for php reservation
+	    case {State#state.free, State#state.reserved} of
+		{[],[]} -> % php_eval workers undiscovered (first call to reserve)
+		    [Pid|Free] = lists:foldl(
+				   fun ({_,Pid,_,[php_eval]}, Acc)->[Pid|Acc];
+				       (_, Acc) -> Acc
+				   end,
+				   [],
+				   supervisor:which_children(State#state.sup)
+				  ),
+		    Php = make_php(Pid,MaxMem),
+		    {reply, make_reply(Php, What), State#state{free=Free, reserved=[Php]}};
+		{[],_} -> % all php_eval workers are reserved
+		    Waiting = [{From,MaxMem,What}],
+		    {noreply, State#state{waiting=Waiting}};
+		{[Pid|Free],_} -> % at least one php_eval worker is free
+		    Php = make_php(Pid,MaxMem),
+		    Reserved = [Php|State#state.reserved],
+		    {reply, make_reply(Php, What), State#state{free=Free, reserved=Reserved}}
+	    end;
+	_ -> % processes are already waiting
+	    Waiting = State#state.waiting++[{From,MaxMem,What}],
+	    {noreply, State#state{waiting=Waiting}}
+    end;
 handle_call({get_mem, Ref}, From, State) ->
-	case find_php(Ref, State#state.reserved) of
-		none -> {reply, {error, invalid_reservation}, State};
-		Php  ->
-			spawn_link( fun () -> do_get_mem(Php, From) end ),
-			{noreply, State}
-	end;
+    case find_php(Ref, State#state.reserved) of
+	none -> {reply, {error, invalid_reservation}, State};
+	Php  ->
+	    spawn_link( fun () -> do_get_mem(Php, From) end ),
+	    {noreply, State}
+    end;
 handle_call(restart_all, From, State) ->
-	Froms = (State#state.restart)#restart.froms,
-	Pids = all_pids(State),
-	[spawn(fun()->eval(";")end) || _ <- lists:seq(1,length(Pids))],
-	{noreply, State#state{restart=#restart{froms=[From|Froms],pids=Pids}}};
+    Froms = (State#state.restart)#restart.froms,
+    Pids = all_pids(State),
+    [spawn(fun()->eval(";")end) || _ <- lists:seq(1,length(Pids))],
+    {noreply, State#state{restart=#restart{froms=[From|Froms],pids=Pids}}};
 handle_call(Request, _From, State) ->
-	{reply, {unknown_call, Request}, State}.
+    {reply, {unknown_call, Request}, State}.
 
 %% @private
 handle_cast({release, Ref}, State) ->
-	case find_php(Ref, State#state.reserved) of
-		none ->
-			{noreply, State};
-		Php ->
-			State2 = maybe_restart(Php#php.pid, State),
-			State3 = do_release(Php, State2),
-			{noreply, State3}
-	end;
+    case find_php(Ref, State#state.reserved) of
+	none ->
+	    {noreply, State};
+	Php ->
+	    State2 = maybe_restart(Php#php.pid, State),
+	    State3 = do_release(Php, State2),
+	    {noreply, State3}
+    end;
 handle_cast(_Msg, State) ->
-	{noreply, State}.
+    {noreply, State}.
 
 %% @private
 handle_info(_Info, State) ->
-	{noreply, State}.
+    {noreply, State}.
 
 %% @private
 terminate(_Reason, _State) ->
-	ok.
+    ok.
 
 %% @private
 code_change(_OldVsn, State, _Extra) ->
-	{ok, State}.
+    {ok, State}.
 
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
 
 reserve_php() ->
-	gen_server:call(?MODULE, {reserve, undefined, php}, infinity).
+    gen_server:call(?MODULE, {reserve, undefined, php}, infinity).
 
 maybe_restart(Pid, #state{restart=#restart{froms=Froms,pids=Pids}}=State) ->
-	case lists:member(Pid, Pids) of
-		false ->
-			State;
+    case lists:member(Pid, Pids) of
+	false ->
+	    State;
+	true ->
+	    gen_server:call(Pid, {eval, "exit;", 1, infinity}, infinity),
+	    Pids2 = lists:delete(Pid, Pids),
+	    if
+		Pids2 =:= [] ->
+		    Restart = #restart{},
+		    lists:foreach(
+		      fun (From) -> gen_server:reply(From, ok) end,
+		      Froms
+		     );
 		true ->
-			gen_server:call(Pid, {eval, "exit;", 1, infinity}, infinity),
-			Pids2 = lists:delete(Pid, Pids),
-			if
-				Pids2 =:= [] ->
-					Restart = #restart{},
-					lists:foreach(
-					  fun (From) -> gen_server:reply(From, ok) end,
-					  Froms
-					 );
-				true ->
-					Restart = #restart{froms=Froms,pids=Pids2}
-			end,
-			State#state{restart=Restart}
-	end.
+		    Restart = #restart{froms=Froms,pids=Pids2}
+	    end,
+	    State#state{restart=Restart}
+    end.
 
 do_release(Php, State) ->
-	Reserved = lists:delete(Php, State#state.reserved),
-	Free = State#state.free ++ [Php#php.pid],
-	case State#state.waiting of
-		[] -> % no processes in the queue
-			State#state{reserved=Reserved, free=Free};
-		[{From,MaxMem,What}|Waiting] -> % there is a process waiting for a reservation
-			[Pid|NewFree] = Free,
-			NextPhp=make_php(Pid,MaxMem),
-			gen_server:reply(From, make_reply(NextPhp, What)),
-			State#state{waiting=Waiting, reserved=[NextPhp|Reserved], free=NewFree}
-	end.
+    Reserved = lists:delete(Php, State#state.reserved),
+    Free = State#state.free ++ [Php#php.pid],
+    case State#state.waiting of
+	[] -> % no processes in the queue
+	    State#state{reserved=Reserved, free=Free};
+	[{From,MaxMem,What}|Waiting] -> % there is a process waiting for a reservation
+	    [Pid|NewFree] = Free,
+	    NextPhp=make_php(Pid,MaxMem),
+	    gen_server:reply(From, make_reply(NextPhp, What)),
+	    State#state{waiting=Waiting, reserved=[NextPhp|Reserved], free=NewFree}
+    end.
 
 do_eval(Code, #php{pid=Pid,maxmem=MaxMem}, From, Timeout) ->
-	Reply = gen_server:call(Pid, {eval, Code, Timeout, MaxMem}, infinity),
-	gen_server:reply(From, Reply);
+    Reply = gen_server:call(Pid, {eval, Code, Timeout, MaxMem}, infinity),
+    gen_server:reply(From, Reply);
 do_eval(Code, _, From, Timeout) ->
-	Php = reserve_php(),
-	do_eval(Code, Php, From, Timeout),
-	release(Php#php.ref).
+    Php = reserve_php(),
+    do_eval(Code, Php, From, Timeout),
+    release(Php#php.ref).
 
 do_get_mem(#php{pid=Pid}, From) ->
-	Mem = gen_server:call(Pid, get_mem),
-	gen_server:reply(From, Mem).
+    Mem = gen_server:call(Pid, get_mem),
+    gen_server:reply(From, Mem).
 
 all_pids(#state{free=[], reserved=[]}) ->
-	[];
+    [];
 all_pids(#state{free=Free,reserved=Reserved}) ->
-	lists:foldl(
-	  fun (#php{pid=Pid}, Acc) -> [Pid|Acc] end,
-	  Free,
-	  Reserved
-	 ).
+    lists:foldl(
+      fun (#php{pid=Pid}, Acc) -> [Pid|Acc] end,
+      Free,
+      Reserved
+     ).
 
 make_php(Pid, MaxMem) ->
-	#php{ref=make_ref(),pid=Pid,maxmem=MaxMem}.
+    #php{ref=make_ref(),pid=Pid,maxmem=MaxMem}.
 
 find_php(_, []) ->
-	none;
+    none;
 find_php(Ref, [#php{ref=Ref}=Php|_]) ->
-	Php;
+    Php;
 find_php(Ref, [_|T]) ->
-	find_php(Ref, T).
+    find_php(Ref, T).
 
 make_reply(Php, php) ->
-	Php;
+    Php;
 make_reply(#php{ref=Ref}, ref) ->
-	Ref.
+    Ref.
