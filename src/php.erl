@@ -49,6 +49,8 @@
 	 eval/1,eval/2,eval/3,
 	 reserve/0,reserve/1,
 	 release/1,
+	 call/2,
+	 return/2,
 	 get_mem/1,
 	 restart_all/0
 	]).
@@ -143,6 +145,31 @@ eval(_, _) ->
 %%      in a reserved PHP persist but that can not be guaranteed.
 eval(Code, Ref, Timeout) ->
     gen_server:call(?MODULE, {eval, Code, Ref, Timeout}, infinity).
+
+%% @spec call(Function, Args) -> result()
+%%       Function = string()
+%%       Args     = [Arg]
+%%       Arg      = string() | integer() | float()
+%% @doc Evaluates a function and returns the return value. Args are
+%%      automatically escaped.
+call(Func, Args) ->
+    call(Func, Args, []).
+
+call(Func, [], QuotedArgs) ->
+    eval("return "++Func++"("++lists:flatten(lists:reverse(QuotedArgs))++");");
+call(Func, [Arg], QuotedArgs) ->
+    call(Func, [], [quote(Arg) | QuotedArgs]);
+call(Func, [Arg | Args], QuotedArgs) ->
+    call(Func, Args, [$,, quote(Arg) | QuotedArgs]).
+
+%% @spec return (Function, Args) -> any()
+%%       Function = string()
+%%       Args     = [Arg]
+%%       Arg      = string() | integer() | float()
+%% @doc Same as call/2 except this returns the return, not the whole result.
+return(Func, Args) ->
+    {_,_,Return,_,_} = call(Func, Args),
+    Return.
 
 %% @spec reserve() -> reference()
 %% @doc Equivalent to reserve(undefined).
@@ -348,3 +375,21 @@ make_reply(Php, php) ->
     Php;
 make_reply(#php{ref=Ref}, ref) ->
     Ref.
+
+%% @spec (list()) -> list()
+%% @doc Replaces ' or \ with \' or \\ for use in single-quoted strings.
+quote(Int) when is_integer(Int) ->
+    integer_to_list(Int);
+quote(Float) when is_float(Float) ->
+    float_to_list(Float);
+quote(Str) when is_list(Str) ->
+    quote(lists:flatten(Str), []).
+
+quote([], Acc) ->
+    "'" ++ lists:reverse(Acc) ++ "'";
+quote([H | T], Acc)
+  when H == 39; H == 92 ->
+    quote(T, [H, 92 | Acc]);
+quote([H | T], Acc) ->
+    quote(T, [H | Acc]).
+
