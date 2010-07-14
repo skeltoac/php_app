@@ -84,7 +84,12 @@
 %% @doc Starts the PHP application, supervisor, a number of workers,
 %%      and this API server module with the options set in php.app.
 start() ->
-	application:start(php).
+    case application:start(php) of
+	{error, {already_started, php}} ->
+	    ok;
+	Other ->
+	    Other
+    end.
 
 %% @spec stop() -> ok
 %% @doc Stops the PHP application and everything it started.
