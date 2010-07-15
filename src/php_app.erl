@@ -12,7 +12,9 @@
 -export([start/2, stop/1]).
 
 start(_Type, StartArgs) ->
-	php_sup:start_link(StartArgs).
+    Start = php_sup:start_link(StartArgs),
+    php:eval(";"),
+    Start.
 
 stop(_State) ->
 	ok.

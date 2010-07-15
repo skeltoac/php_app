@@ -52,7 +52,9 @@
 	 call/2,
 	 return/2,
 	 get_mem/1,
-	 restart_all/0
+	 restart_all/0,
+	 require_code/1,
+	 unrequire/1
 	]).
 
 %% gen_server callbacks
@@ -64,7 +66,8 @@
 	  free     = [],
 	  reserved = [],
 	  waiting  = [],
-	  restart
+	  restart,
+	  require  = []
 	 }).
 
 -record(php, {
@@ -207,6 +210,20 @@ get_mem(Ref) ->
 restart_all() ->
     gen_server:call(?MODULE, restart_all, infinity).
 
+%% @spec require_code(string()) -> ref()
+%% @doc Adds code to be executed when initializing a PHP worker and
+%%      restarts all. The return value can be passed to unrequire/1.
+require_code(Code) ->
+    Ref = gen_server:call(?MODULE, {require_code, Code}, infinity),
+    restart_all(),
+    Ref.
+
+%% @spec unrequire(ref()) -> ok
+%% @doc Removes code from PHP worker initialization and restarts all.
+unrequire(Ref) ->
+    gen_server:call(?MODULE, {unrequire, Ref}, infinity),
+    restart_all().
+
 %%====================================================================
 %% gen_server callbacks
 %%====================================================================
@@ -270,8 +287,18 @@ handle_call({get_mem, Ref}, From, State) ->
 handle_call(restart_all, From, State) ->
     Froms = (State#state.restart)#restart.froms,
     Pids = all_pids(State),
+    %% Restart occurs on worker release. These evals cause idle workers
+    %% to reserve/release ASAP. Reserved workers will hold up the reply
+    %% to the processes that called restart_all() until they release.
     [spawn(fun()->eval(";")end) || _ <- lists:seq(1,length(Pids))],
     {noreply, State#state{restart=#restart{froms=[From|Froms],pids=Pids}}};
+handle_call({require_code, Code}, _From, #state{require=Require}=State) ->
+    Ref = make_ref(),
+    {reply, Ref, State#state{require=[{Ref, {code, Code}}|Require]}};
+handle_call({unrequire, Ref}, From, #state{require=Require}=State) ->
+    Require1 = proplists:delete(Ref, Require),
+    {_, NewState} = handle_call(restart_all, From, State#state{require=Require1}),
+    {noreply, NewState};
 handle_call(Request, _From, State) ->
     {reply, {unknown_call, Request}, State}.
 
@@ -313,6 +340,7 @@ maybe_restart(Pid, #state{restart=#restart{froms=Froms,pids=Pids}}=State) ->
 	    State;
 	true ->
 	    gen_server:call(Pid, {eval, "exit;", 1, infinity}, infinity),
+	    do_require(State#state.require, Pid),
 	    Pids2 = lists:delete(Pid, Pids),
 	    if
 		Pids2 =:= [] ->
@@ -351,6 +379,12 @@ do_eval(Code, _, From, Timeout) ->
 do_get_mem(#php{pid=Pid}, From) ->
     Mem = gen_server:call(Pid, get_mem),
     gen_server:reply(From, Mem).
+
+do_require([], _Pid) ->
+    ok;
+do_require([{_Ref, {code, Code}} | Reqs], Pid) ->
+    gen_server:call(Pid, {eval, Code, 500, infinity}),
+    do_require(Reqs, Pid).
 
 all_pids(#state{free=[], reserved=[]}) ->
     [];
