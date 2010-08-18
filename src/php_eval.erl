@@ -19,7 +19,7 @@
 -import(php_util,[get_opt/3]).
 
 %% port handler in PHP
--define(PHPLOOP, "ini_set('track_errors',true);do{ob_start();@$_C_=fread(STDIN,array_pop(unpack('N',fread(STDIN,4))));@trigger_error('');if(eval('return true;'.$_C_)){$_R_=serialize(eval($_C_));}else{$_R_='E;';}$_R_.=serialize($php_errormsg);$_R_.=serialize(ob_get_clean());fwrite(STDOUT,pack('N',strlen($_R_)).$_R_);}while(!empty($_C_));exit;").
+-define(PHPLOOP, "ini_set('track_errors',true);do{ob_start();@$_C_=fread(STDIN,array_pop(unpack('N',fread(STDIN,4))));@trigger_error('');if(eval('return true;if(0){'.$_C_.'}')){$_R_=serialize(eval($_C_));}else{$_R_='E;';}$_R_.=serialize($php_errormsg);$_R_.=serialize(ob_get_clean());fwrite(STDOUT,pack('N',strlen($_R_)).$_R_);}while(!empty($_C_));exit;").
 
 -record(state, {
 	  port,
