@@ -54,7 +54,9 @@
 	 get_mem/1,
 	 restart_all/0,
 	 require_code/1,
-	 unrequire/1
+	 unrequire/1,
+	 reload/0,
+	 reload_clean/0
 	]).
 
 %% gen_server callbacks
@@ -210,6 +212,10 @@ get_mem(Ref) ->
 restart_all() ->
     gen_server:call(?MODULE, restart_all, infinity).
 
+%% @private
+require({code, Code}) ->
+    require_code(Code).
+
 %% @spec require_code(string()) -> ref()
 %% @doc Adds code to be executed when initializing a PHP worker and
 %%      restarts all. The return value can be passed to unrequire/1.
@@ -221,6 +227,34 @@ require_code(Code) ->
 unrequire(Ref) ->
     gen_server:call(?MODULE, {unrequire, Ref}, infinity),
     restart_all().
+
+%% @spec reload() -> ok
+%% @doc Reloads the application completely, carrying over any requires.
+%%      Specifically, this stops the app, unloads the app, loads the
+%%      app, loads the modules, starts the app, adds each require.
+%%      Meanwhile calls will result in noproc.
+reload() ->
+    State = gen_server:call(?MODULE, get_state, infinity),
+    Require = State#state.require,
+    ok = reload_clean(),
+    [ require(Req) || {_, Req} <- Require ],
+    ok.
+
+%% @spec reload() -> ok
+%% @doc Same as reload() except no requires are carried over.
+reload_clean() ->
+    application:stop(php),
+    application:unload(php),
+    application:load(php),
+    {ok, Mods} = application:get_key(php, modules),
+    lists:foreach(
+      fun(Mod) ->
+	      code:purge(Mod),
+	      code:load_file(Mod)
+      end,
+      Mods),
+    php:start().
+
 
 %%====================================================================
 %% gen_server callbacks
