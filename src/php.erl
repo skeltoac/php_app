@@ -214,9 +214,7 @@ restart_all() ->
 %% @doc Adds code to be executed when initializing a PHP worker and
 %%      restarts all. The return value can be passed to unrequire/1.
 require_code(Code) ->
-    Ref = gen_server:call(?MODULE, {require_code, Code}, infinity),
-    restart_all(),
-    Ref.
+    gen_server:call(?MODULE, {require_code, Code}, infinity).
 
 %% @spec unrequire(ref()) -> ok
 %% @doc Removes code from PHP worker initialization and restarts all.
@@ -294,11 +292,15 @@ handle_call(restart_all, From, State) ->
     {noreply, State#state{restart=#restart{froms=[From|Froms],procs=Procs}}};
 handle_call({require_code, Code}, _From, #state{require=Require}=State) ->
     Ref = make_ref(),
-    {reply, Ref, State#state{require=[{Ref, {code, Code}}|Require]}};
-handle_call({unrequire, Ref}, From, #state{require=Require}=State) ->
-    Require1 = proplists:delete(Ref, Require),
-    {_, NewState} = handle_call(restart_all, From, State#state{require=Require1}),
-    {noreply, NewState};
+    Procs = all_procs(State),
+    NewRequire = Require ++ [{Ref, {code, Code}}],
+    require_all(Procs, NewRequire),
+    {reply, Ref, State#state{require=NewRequire}};
+handle_call({unrequire, Ref}, _From, #state{require=Require}=State) ->
+    Procs = all_procs(State),
+    NewRequire = proplists:delete(Ref, Require),
+    require_all(Procs, NewRequire),
+    {reply, ok, State#state{require=NewRequire}};
 handle_call(Request, _From, State) ->
     {reply, {unknown_call, Request}, State}.
 
@@ -340,7 +342,6 @@ maybe_restart(Proc, #state{restart=#restart{froms=Froms,procs=Procs}}=State) ->
 	    State;
 	true ->
 	    gen_server:call(Proc, {eval, "exit;", 1, infinity}, infinity),
-	    do_require(State#state.require, Proc),
 	    Procs2 = lists:delete(Proc, Procs),
 	    if
 		Procs2 =:= [] ->
@@ -380,11 +381,11 @@ do_get_mem(#php{proc=Proc}, From) ->
     Mem = gen_server:call(Proc, get_mem),
     gen_server:reply(From, Mem).
 
-do_require([], _Proc) ->
+require_all([], _Req) ->
     ok;
-do_require([{_Ref, {code, Code}} | Reqs], Proc) ->
-    gen_server:call(Proc, {eval, Code, 500, infinity}),
-    do_require(Reqs, Proc).
+require_all([Proc | Procs], Require) ->
+    gen_server:call(Proc, {require, Require}, infinity),
+    require_all(Procs, Require).
 
 all_procs(#state{free=[], reserved=[]}) ->
     [];

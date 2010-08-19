@@ -24,7 +24,8 @@
 -record(state, {
 	  port,
 	  opts,
-	  pid
+	  pid,
+	  require = []
 	 }).
 
 %%====================================================================
@@ -77,6 +78,14 @@ handle_call(get_mem, _, OrigState) ->
     {reply, Mem, State};
 handle_call(restart_php, _, State) ->
     {reply, ok, restart_php(State)};
+handle_call({require, Require}, _From, OrigState) ->
+    NewState = restart_php(OrigState#state{require=Require}),
+    case NewState#state.pid of
+	Pid when is_integer(Pid) ->
+	    {reply, ok, NewState};
+	_ ->
+	    {reply, error, restart_php(OrigState)}
+    end;
 handle_call(_Request, _From, State) ->
     {noreply, State}.
 
@@ -99,7 +108,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%--------------------------------------------------------------------
 
-start_php(#state{opts=Opts}=State) ->
+start_php(#state{opts=Opts, require=Require}=State) ->
     Php  = get_opt(php,  Opts, "php"),
     Init = get_opt(init, Opts, []),
     Dir  = get_opt(dir,  Opts, []),
@@ -115,8 +124,15 @@ start_php(#state{opts=Opts}=State) ->
 	    _  -> [{env, Envs}]
 	end,
     Port = open_port({spawn, Command}, PortOpts),
+    require(Port, Require),
     Pid  = get_pid(Port),
     State#state{port=Port,pid=Pid}.
+
+require(_, []) ->
+    ok;
+require(Port, [{_, {code, Code}} | Require]) ->
+    exec_php(Port, Code, 5000),
+    require(Port, Require).
 
 stop_php(Port) ->
     case erlang:port_info(Port) of
