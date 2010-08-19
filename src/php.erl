@@ -240,7 +240,7 @@ reload() ->
     [ require(Req) || {_, Req} <- Require ],
     ok.
 
-%% @spec reload() -> ok
+%% @spec reload_clean() -> ok
 %% @doc Same as reload() except no requires are carried over.
 reload_clean() ->
     application:stop(php),
