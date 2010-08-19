@@ -40,7 +40,8 @@ PHP code evaluation to help prevent resource hogging.</p>
 
 
 <h2><a name="index">Function Index</a></h2>
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#eval-1">eval/1</a></td><td>Equivalent to eval(Code, undefined, infinity).</td></tr>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#call-2">call/2</a></td><td>Evaluates a function and returns the return value.</td></tr>
+<tr><td valign="top"><a href="#eval-1">eval/1</a></td><td>Equivalent to eval(Code, undefined, infinity).</td></tr>
 <tr><td valign="top"><a href="#eval-2">eval/2</a></td><td>Equivalent to eval(Code, Php, infinity) or eval(Code,
        undefined, Timeout).</td></tr>
 <tr><td valign="top"><a href="#eval-3">eval/3</a></td><td>Tests syntax and evaluates PHP code.</td></tr>
@@ -48,16 +49,32 @@ PHP code evaluation to help prevent resource hogging.</p>
        `ps -o rss`.</td></tr>
 <tr><td valign="top"><a href="#release-1">release/1</a></td><td>Cancels the reservation of a PHP instance, returning it
        to the pool of available instances.</td></tr>
+<tr><td valign="top"><a href="#reload-0">reload/0</a></td><td>Reloads the application completely, carrying over any requires.</td></tr>
+<tr><td valign="top"><a href="#reload_clean-0">reload_clean/0</a></td><td>Same as reload() except no requires are carried over.</td></tr>
+<tr><td valign="top"><a href="#require_code-1">require_code/1</a></td><td>Adds code to be executed when initializing a PHP worker and
+       restarts all.</td></tr>
 <tr><td valign="top"><a href="#reserve-0">reserve/0</a></td><td>Equivalent to reserve(undefined).</td></tr>
 <tr><td valign="top"><a href="#reserve-1">reserve/1</a></td><td>Reserves a PHP instance that will only be accessible to
        callers possessing the key returned by this function.</td></tr>
 <tr><td valign="top"><a href="#restart_all-0">restart_all/0</a></td><td>Restarts each PHP thread, waiting if any are reserved.</td></tr>
+<tr><td valign="top"><a href="#return-2">return/2</a></td><td>Same as call/2 except this returns the return, not the whole result.</td></tr>
 <tr><td valign="top"><a href="#start-0">start/0</a></td><td>Starts the PHP application, supervisor, a number of workers,
        and this API server module with the options set in php.app.</td></tr>
 <tr><td valign="top"><a href="#stop-0">stop/0</a></td><td>Stops the PHP application and everything it started.</td></tr>
+<tr><td valign="top"><a href="#unrequire-1">unrequire/1</a></td><td>Removes code from PHP worker initialization and restarts all.</td></tr>
 </table>
 
 <h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="call-2">call/2</a></h3>
+<div class="spec">
+<p><tt>call(Func::Function, Args) -&gt; <a href="#type-result">result()</a></tt>
+<ul class="definitions"><li><tt>Function = string()</tt></li>
+<li><tt>Args = [Arg]</tt></li>
+<li><tt>Arg = string() | integer() | float()</tt></li>
+</ul></p>
+</div><p>Evaluates a function and returns the return value. Args are
+       automatically escaped.</p>
 
 <h3 class="function"><a name="eval-1">eval/1</a></h3>
 <div class="spec">
@@ -104,6 +121,25 @@ PHP code evaluation to help prevent resource hogging.</p>
 </div><p>Cancels the reservation of a PHP instance, returning it
        to the pool of available instances.</p>
 
+<h3 class="function"><a name="reload-0">reload/0</a></h3>
+<div class="spec">
+<p><tt>reload() -&gt; ok</tt></p>
+</div><p>Reloads the application completely, carrying over any requires.
+       Specifically, this stops the app, unloads the app, loads the
+       app, loads the modules, starts the app, adds each require.
+       Meanwhile calls will result in noproc.</p>
+
+<h3 class="function"><a name="reload_clean-0">reload_clean/0</a></h3>
+<div class="spec">
+<p><tt>reload_clean() -&gt; ok</tt></p>
+</div><p>Same as reload() except no requires are carried over.</p>
+
+<h3 class="function"><a name="require_code-1">require_code/1</a></h3>
+<div class="spec">
+<p><tt>require_code(Code::string()) -&gt; <a href="#type-ref">ref()</a></tt></p>
+</div><p>Adds code to be executed when initializing a PHP worker and
+       restarts all. The return value can be passed to unrequire/1.</p>
+
 <h3 class="function"><a name="reserve-0">reserve/0</a></h3>
 <div class="spec">
 <p><tt>reserve() -&gt; reference()</tt></p>
@@ -128,6 +164,15 @@ PHP code evaluation to help prevent resource hogging.</p>
 </div><p>Restarts each PHP thread, waiting if any are reserved. This
        is intended to force an updated PHPLOOP into use.</p>
 
+<h3 class="function"><a name="return-2">return/2</a></h3>
+<div class="spec">
+<p><tt>return(Func::Function, Args) -&gt; any()</tt>
+<ul class="definitions"><li><tt>Function = string()</tt></li>
+<li><tt>Args = [Arg]</tt></li>
+<li><tt>Arg = string() | integer() | float()</tt></li>
+</ul></p>
+</div><p>Same as call/2 except this returns the return, not the whole result.</p>
+
 <h3 class="function"><a name="start-0">start/0</a></h3>
 <div class="spec">
 <p><tt>start() -&gt; ok</tt></p>
@@ -138,9 +183,14 @@ PHP code evaluation to help prevent resource hogging.</p>
 <div class="spec">
 <p><tt>stop() -&gt; ok</tt></p>
 </div><p>Stops the PHP application and everything it started.</p>
+
+<h3 class="function"><a name="unrequire-1">unrequire/1</a></h3>
+<div class="spec">
+<p><tt>unrequire(Ref::<a href="#type-ref">ref()</a>) -&gt; ok</tt></p>
+</div><p>Removes code from PHP worker initialization and restarts all.</p>
 <hr>
 
 <div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
-<p><i>Generated by EDoc, Feb 6 2009, 09:29:57.</i></p>
+<p><i>Generated by EDoc, Aug 19 2010, 16:13:09.</i></p>
 </body>
 </html>
