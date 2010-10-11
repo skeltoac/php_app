@@ -189,7 +189,7 @@ escape([H|T], Acc) ->
     end.
 
 exec_php(Port, Code, Timeout) ->
-    Port ! {self(), {command, list_to_binary(Code)}},
+    Port ! {self(), {command, unicode:characters_to_binary(Code)}},
     receive
 	{Port, {exit_status, Status}} -> {exit, Status};
 	{Port, {data, Data}}          -> {Return, Rest} = php_util:unserialize(Data),
