@@ -46,33 +46,42 @@ init(Opts) ->
 
 handle_call(get_state, _, State) ->
     {reply, State, State};
-handle_call({eval, Code, Timeout, MaxMem}, _, #state{opts=Opts}=OrigState) ->
+handle_call({eval, Code, Timeout, MaxMem}, From, #state{opts=Opts}=OrigState) ->
     State = guarantee_php(OrigState),
     Exec  = exec_php(State#state.port, Code, Timeout),
     Limit = if
 		MaxMem =:= undefined -> get_opt(maxmem, Opts, infinity);
 		true -> MaxMem
 	    end,
-    case Limit of
-	infinity ->
-	    NewState = State;
-	_ ->
-	    case get_mem(State#state.pid) of
-		Mem when not is_integer(Mem); Mem > Limit ->
-		    NewState = restart_php(State);
-		_ ->
-		    NewState = State
-	    end
-    end,
-    Reply = if
-		element(1, Exec) =:= exit ->
+    Restart = case {element(1, Exec), Limit} of
+		  {exit, _} ->
+		      true;
+		  {ok, infinity} ->
+		      false;
+		  {ok, _} ->
+		      case get_mem(State#state.pid) of
+			  Mem when not is_integer(Mem); Mem > Limit ->
+			      true;
+			  _ ->
+			      false
+		      end
+	      end,
+    Reply = case {element(1, Exec), Restart} of
+		{exit, _} ->
 		    Exec;
-		NewState#state.pid =:= State#state.pid ->
-		    erlang:append_element(Exec, continue);
-		true ->
-		    erlang:append_element(Exec, break)
+		{ok, true} ->
+		    erlang:append_element(Exec, break);
+		{ok, false} ->
+		    erlang:append_element(Exec, continue)
 	    end,
-    {reply, Reply, NewState};
+    gen_server:reply(From, Reply),
+    NewState = case Restart of
+		   true ->
+		       restart_php(State);
+		   false ->
+		       State
+	       end,
+    {noreply, NewState};
 handle_call(get_mem, _, OrigState) ->
     State = guarantee_php(OrigState),
     Mem = get_mem(State#state.pid),
