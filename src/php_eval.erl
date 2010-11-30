@@ -10,7 +10,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, start_link/1]).
+-export([start_link/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -19,21 +19,20 @@
 -import(php_util,[get_opt/3]).
 
 %% port handler in PHP
--define(PHPLOOP, "ini_set('track_errors',true);do{ob_start();@$_C_=fread(STDIN,array_pop(unpack('N',fread(STDIN,4))));@trigger_error('');if(eval('return true;'.$_C_)){$_R_=serialize(eval($_C_));}else{$_R_='E;';}$_R_.=serialize($php_errormsg);$_R_.=serialize(ob_get_clean());fwrite(STDOUT,pack('N',strlen($_R_)).$_R_);}while(!empty($_C_));exit;").
+-define(PHPLOOP, "ini_set('track_errors',true);do{ob_start();@$_C_=fread(STDIN,array_pop(unpack('N',fread(STDIN,4))));@trigger_error('');if(eval('return true;if(0){'.$_C_.'}')){$_R_=serialize(eval($_C_));}else{$_R_='E;';}$_R_.=serialize($php_errormsg);$_R_.=serialize(ob_get_clean());fwrite(STDOUT,pack('N',strlen($_R_)).$_R_);}while(!empty($_C_));exit;").
 
 -record(state, {
 	  port,
 	  opts,
-	  pid
+	  pid,
+	  require = []
 	 }).
 
 %%====================================================================
 %% API
 %%====================================================================
-start_link() ->
-    start_link([]).
-start_link(Args) ->
-    gen_server:start_link(?MODULE, Args, []).
+start_link(Args, Proc) ->
+    gen_server:start_link({local, Proc}, ?MODULE, Args, []).
 
 %%====================================================================
 %% gen_server callbacks
@@ -88,6 +87,14 @@ handle_call(get_mem, _, OrigState) ->
     {reply, Mem, State};
 handle_call(restart_php, _, State) ->
     {reply, ok, restart_php(State)};
+handle_call({require, Require}, _From, OrigState) ->
+    NewState = restart_php(OrigState#state{require=Require}),
+    case NewState#state.pid of
+	Pid when is_integer(Pid) ->
+	    {reply, ok, NewState};
+	_ ->
+	    {reply, error, restart_php(OrigState)}
+    end;
 handle_call(_Request, _From, State) ->
     {noreply, State}.
 
@@ -110,7 +117,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%--------------------------------------------------------------------
 
-start_php(#state{opts=Opts}=State) ->
+start_php(#state{opts=Opts, require=Require}=State) ->
     Php  = get_opt(php,  Opts, "php"),
     Init = get_opt(init, Opts, []),
     Dir  = get_opt(dir,  Opts, []),
@@ -126,8 +133,15 @@ start_php(#state{opts=Opts}=State) ->
 	    _  -> [{env, Envs}]
 	end,
     Port = open_port({spawn, Command}, PortOpts),
+    require(Port, Require),
     Pid  = get_pid(Port),
     State#state{port=Port,pid=Pid}.
+
+require(_, []) ->
+    ok;
+require(Port, [{_, {code, Code}} | Require]) ->
+    exec_php(Port, Code, 5000),
+    require(Port, Require).
 
 stop_php(Port) ->
     case erlang:port_info(Port) of
@@ -184,7 +198,7 @@ escape([H|T], Acc) ->
     end.
 
 exec_php(Port, Code, Timeout) ->
-    Port ! {self(), {command, list_to_binary(Code)}},
+    Port ! {self(), {command, unicode:characters_to_binary(Code)}},
     receive
 	{Port, {exit_status, Status}} -> {exit, Status};
 	{Port, {data, Data}}          -> {Return, Rest} = php_util:unserialize(Data),

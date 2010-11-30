@@ -1,5 +1,8 @@
 {application, php,
  [
+  {modules,
+   [php, php_app, php_eval, php_sup, php_util]
+  },
   {mod,
    {php_app,
 	[

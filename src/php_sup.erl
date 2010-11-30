@@ -40,10 +40,10 @@ init(Args) ->
 	Opts = get_opt(opts, Args, []),
 	Interface = { php, {php, start_link, [] },
 				permanent, 2000, worker, [php] }, 
-	Servers = [ {get_proc_name(phpeval,P),{php_eval,start_link,[Opts]},
+	Servers = [ {Proc,{php_eval,start_link,[Opts, Proc]},
 				 permanent,2000,worker,[php_eval]}
-				|| P <- lists:seq(1, Procs) ],
-	{ok,{{one_for_all,1,1}, Servers ++ [Interface]}}.
+				|| P <- lists:seq(1, Procs), Proc <- [get_proc_name(phpeval,P)] ],
+	{ok,{{one_for_one,1,1}, Servers ++ [Interface]}}.
 
 %%====================================================================
 %% Internal functions
